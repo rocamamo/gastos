@@ -2,10 +2,10 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { Receipt } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function LoginPage() {
+function LoginContent() {
     const supabase = createClient();
     const searchParams = useSearchParams();
     const [error, setError] = useState(false);
@@ -72,5 +72,13 @@ export default function LoginPage() {
                 </button>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={null}>
+            <LoginContent />
+        </Suspense>
     );
 }
