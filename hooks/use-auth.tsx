@@ -1,0 +1,68 @@
+'use client';
+
+import { createContext, useContext, useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { User } from '@supabase/supabase-js';
+
+type AuthContextType = {
+    user: User | null;
+    profile: any | null;
+    isLoading: boolean;
+    signOut: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+    const [user, setUser] = useState<User | null>(null);
+    const [profile, setProfile] = useState<any | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const supabase = createClient();
+
+    useEffect(() => {
+        const fetchSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setUser(session?.user ?? null);
+
+            if (session?.user) {
+                // Fetch complete profile if needed
+                const res = await fetch('/api/me');
+                if (res.ok) {
+                    const profileData = await res.json();
+                    setProfile(profileData);
+                }
+            }
+            setIsLoading(false);
+        };
+
+        fetchSession();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (_event, session) => {
+                setUser(session?.user ?? null);
+                if (!session?.user) setProfile(null);
+            }
+        );
+
+        return () => subscription.unsubscribe();
+    }, [supabase.auth]);
+
+    const signOut = async () => {
+        await supabase.auth.signOut();
+        window.location.href = '/login';
+    };
+
+    return (
+        <AuthContext.Provider value={{ user, profile, isLoading, signOut }}>
+            {children}
+        </AuthContext.Provider>
+    );
+}
+
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
+};
