@@ -30,7 +30,7 @@ export function ExpenseForm({
     const { data: categories } = useQuery({
         queryKey: ['categories'],
         queryFn: async () => {
-            const { data, error } = await supabase.from('categories').select('*');
+            const { data, error } = await supabase.from('categories').select('*').order('name');
             if (error) throw error;
             return data;
         }
