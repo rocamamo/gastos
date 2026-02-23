@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.expenses (
 
 -- Insert essential categories
 INSERT INTO public.categories (name) VALUES 
-('Mercado'), ('Ropa Niños'), ('Transporte'), ('Restaurantes'), ('Medicos'), ('Colegio'), ('Utiles escolares'), ('Regalos'), ('Otros')
+('Mercado'), ('Ropa Niños'), ('Transporte'), ('Restaurantes'), ('Medicos'), ('Colegio'), ('Utiles escolares'), ('Regalos'), ('Empleada'), ('Vacaciones'), ('Otros')
 ON CONFLICT (name) DO NOTHING;
 
 -- 3. Row Level Security (RLS) Policies

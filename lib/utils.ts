@@ -16,7 +16,15 @@ export function formatCurrency(amount: number, currency: 'COP' | 'USD') {
 
 export function formatDate(dateString: string | Date) {
   const date = new Date(dateString);
-  return new Intl.DateTimeFormat('es-CO', {
+  // Para evitar que la fecha cambie por la zona horaria (offset), 
+  // usamos UTC si el input es una cadena de fecha simple YYYY-MM-DD
+  const options: Intl.DateTimeFormatOptions = {
     dateStyle: 'medium',
-  }).format(date);
+  };
+
+  if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    options.timeZone = 'UTC';
+  }
+
+  return new Intl.DateTimeFormat('es-CO', options).format(date);
 }
