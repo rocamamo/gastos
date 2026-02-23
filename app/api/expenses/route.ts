@@ -19,9 +19,11 @@ export async function GET(request: NextRequest) {
     let query = supabase.from('expenses').select(`*, users(name, email), categories(name)`);
 
     if (month) {
-        const startDate = new Date(`${month}-01`);
-        const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
-        query = query.gte('expense_date', startDate.toISOString()).lte('expense_date', endDate.toISOString());
+        const [year, monthNum] = month.split('-').map(Number);
+        const startDate = `${month}-01`;
+        const lastDay = new Date(year, monthNum, 0).getDate();
+        const endDate = `${month}-${lastDay}`;
+        query = query.gte('expense_date', startDate).lte('expense_date', endDate);
     }
 
     if (category_id) {

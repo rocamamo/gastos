@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { FileUploader } from '@/components/ui/file-uploader';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 export function ExpenseForm({
     onSuccess,
@@ -159,11 +160,15 @@ export function ExpenseForm({
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['expenses'] });
+            toast.success(isEditing ? 'Gasto actualizado correctamente' : 'Gasto registrado correctamente');
             reset();
             setFile(null);
             setDisplayAmount('');
             onSuccess?.();
         },
+        onError: (error: any) => {
+            toast.error(error.message || 'Error al procesar el gasto');
+        }
     });
 
     const onSubmit = async (data: ExpenseInput) => {
@@ -259,9 +264,6 @@ export function ExpenseForm({
                 <Button type="submit" disabled={isSubmitting || isUploading} className="w-full h-12 text-base">
                     {isSubmitting || isUploading ? 'Procesando...' : (isEditing ? 'Actualizar Gasto' : 'Guardar Gasto')}
                 </Button>
-                {expenseMutation.isError && (
-                    <p className="text-sm font-medium text-red-500 text-center mt-3">Error al procesar el gasto. Revise los datos.</p>
-                )}
             </div>
         </form>
     );

@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   description: 'Aplicación colaborativa de control de gastos',
 };
 
+import { Toaster } from 'sonner';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -22,6 +24,7 @@ export default function RootLayout({
         <Providers>
           <AuthProvider>
             {children}
+            <Toaster position="top-right" richColors closeButton />
           </AuthProvider>
         </Providers>
       </body>

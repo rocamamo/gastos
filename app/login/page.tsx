@@ -2,17 +2,16 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { Receipt } from 'lucide-react';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
 
 function LoginContent() {
     const supabase = createClient();
     const searchParams = useSearchParams();
-    const [error, setError] = useState(false);
-
     useEffect(() => {
         if (searchParams.get('error')) {
-            setError(true);
+            toast.error('Error de autenticación. Por favor, intenta de nuevo.');
         }
     }, [searchParams]);
 
@@ -39,12 +38,6 @@ function LoginContent() {
                         Ingresa para gestionar y analizar tus gastos compartidos de forma colaborativa.
                     </p>
                 </div>
-
-                {error && (
-                    <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-red-900/30 dark:text-red-400" role="alert">
-                        <span className="font-medium">Error de autenticación.</span> Por favor, intenta de nuevo.
-                    </div>
-                )}
 
                 <button
                     onClick={handleGoogleLogin}

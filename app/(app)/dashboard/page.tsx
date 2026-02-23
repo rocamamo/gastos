@@ -142,8 +142,9 @@ export default function DashboardPage() {
                                     <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
                                     <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatTick} />
                                     <Tooltip
-                                        formatter={(value: any) => [formatVal(value || 0), 'Total']}
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                        formatter={(value: any) => [formatVal(value || 0), 'Monto Total']}
+                                        labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', color: '#1e293b' }}
                                     />
                                     <Area type="monotone" dataKey={valueKey} stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
                                 </AreaChart>
@@ -165,9 +166,10 @@ export default function DashboardPage() {
                                     <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
                                     <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatTick} />
                                     <Tooltip
-                                        formatter={(value: any) => [formatVal(value || 0), 'Gastado']}
+                                        formatter={(value: any) => [formatVal(value || 0), 'Monto Gastado']}
+                                        labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}
                                         cursor={{ fill: 'rgba(241, 245, 249, 0.5)' }}
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', color: '#1e293b' }}
                                     />
                                     <Bar dataKey={valueKey} fill="#8b5cf6" radius={[6, 6, 0, 0]} />
                                 </BarChart>
@@ -200,8 +202,8 @@ export default function DashboardPage() {
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        formatter={(value: any) => [formatVal(value || 0), 'Total']}
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                        formatter={(value: any, name?: string) => [formatVal(value || 0), name || '']}
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', color: '#1e293b' }}
                                     />
                                     <Legend verticalAlign="bottom" height={36} iconType="circle" />
                                 </PieChart>

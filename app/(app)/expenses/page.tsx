@@ -10,10 +10,13 @@ import { ExpenseForm } from '@/components/expenses/ExpenseForm';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Plus, Search, Trash2, Paperclip, FilterX, Pencil } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 export default function ExpensesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedExpense, setSelectedExpense] = useState<any>(null);
+    const [expenseToDelete, setExpenseToDelete] = useState<any>(null);
     const [filters, setFilters] = useState({ month: '', category_id: '', currency: '' });
     const { user } = useAuth();
     const queryClient = useQueryClient();
@@ -46,18 +49,29 @@ export default function ExpensesPage() {
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
             const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-            if (!res.ok) throw new Error('Failed to delete');
+            if (!res.ok) throw new Error('No se pudo eliminar el gasto');
+            if (res.status === 204) return null;
+            return res.json();
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['expenses'] });
+            toast.success('Gasto eliminado exitosamente');
+            setIsDeleteModalOpen(false);
+            setExpenseToDelete(null);
+        },
+        onError: (error: any) => {
+            toast.error(error.message);
         }
     });
 
-    const handleDelete = (id: string, ownerId: string) => {
-        if (user?.id !== ownerId) return alert('Solo el creador puede eliminar este gasto.');
-        if (confirm('¿Estás seguro de eliminar este gasto?')) {
-            deleteMutation.mutate(id);
+    const handleDelete = (expense: any) => {
+        if (user?.id !== expense.user_id) {
+            toast.error('Solo el creador puede eliminar este gasto.');
+            return;
         }
+
+        setExpenseToDelete(expense);
+        setIsDeleteModalOpen(true);
     };
 
     const clearFilters = () => setFilters({ month: '', category_id: '', currency: '' });
@@ -197,7 +211,7 @@ export default function ExpensesPage() {
                                                                 <Pencil className="h-4 w-4" />
                                                             </button>
                                                             <button
-                                                                onClick={() => handleDelete(expense.id, expense.user_id)}
+                                                                onClick={() => handleDelete(expense)}
                                                                 className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
                                                                 title="Eliminar"
                                                             >
@@ -210,6 +224,20 @@ export default function ExpensesPage() {
                                         </tr>
                                     ))}
                                 </tbody>
+                                <tfoot className="bg-slate-50/80 dark:bg-slate-800/80 font-bold border-t-2 border-slate-200 dark:border-slate-700">
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-4 text-slate-900 dark:text-white text-right">TOTAL</td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="text-slate-900 dark:text-white">
+                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_cop), 0) || 0, 'COP')}
+                                            </div>
+                                            <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_usd), 0) || 0, 'USD')}
+                                            </div>
+                                        </td>
+                                        <td colSpan={2}></td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
@@ -225,6 +253,56 @@ export default function ExpensesPage() {
                     initialData={selectedExpense}
                     onSuccess={() => setIsModalOpen(false)}
                 />
+            </Modal>
+
+            <Modal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                title="Confirmar eliminación"
+            >
+                <div className="space-y-6">
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-900/30">
+                        <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
+                            ¿Estás seguro de que deseas eliminar este registro? Esta acción no se puede deshacer.
+                        </p>
+                        {expenseToDelete && (
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="font-semibold text-slate-500">Detalle:</span>
+                                    <span className="text-slate-900 dark:text-white font-medium">{expenseToDelete.detail}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-semibold text-slate-500">Monto:</span>
+                                    <span className="text-slate-900 dark:text-white font-medium">
+                                        {formatCurrency(Number(expenseToDelete.amount_cop), 'COP')}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-semibold text-slate-500">Fecha:</span>
+                                    <span className="text-slate-900 dark:text-white font-medium">{formatDate(expenseToDelete.expense_date)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex gap-3">
+                        <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => setIsDeleteModalOpen(false)}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            className="flex-1 bg-red-600 hover:bg-red-700"
+                            onClick={() => deleteMutation.mutate(expenseToDelete.id)}
+                            disabled={deleteMutation.isPending}
+                        >
+                            {deleteMutation.isPending ? 'Eliminando...' : 'Sí, eliminar'}
+                        </Button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );
