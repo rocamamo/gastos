@@ -17,7 +17,7 @@ export default function ExpensesPage() {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedExpense, setSelectedExpense] = useState<any>(null);
     const [expenseToDelete, setExpenseToDelete] = useState<any>(null);
-    const [filters, setFilters] = useState({ month: '', category_id: '', currency: '' });
+    const [filters, setFilters] = useState({ month: '', category_id: '', user_id: '' });
     const { user } = useAuth();
     const queryClient = useQueryClient();
 
@@ -30,11 +30,20 @@ export default function ExpensesPage() {
         }
     });
 
+    const { data: usersList } = useQuery({
+        queryKey: ['users'],
+        queryFn: async () => {
+            const res = await fetch('/api/users');
+            if (!res.ok) throw new Error('Failed to fetch users');
+            return res.json();
+        }
+    });
+
     const fetchExpenses = async () => {
         const params = new URLSearchParams();
         if (filters.month) params.append('month', filters.month);
         if (filters.category_id) params.append('category_id', filters.category_id);
-        if (filters.currency) params.append('currency', filters.currency);
+        if (filters.user_id) params.append('user_id', filters.user_id);
 
         const res = await fetch(`/api/expenses?${params.toString()}`);
         if (!res.ok) throw new Error('Failed to fetch expenses');
@@ -74,7 +83,7 @@ export default function ExpensesPage() {
         setIsDeleteModalOpen(true);
     };
 
-    const clearFilters = () => setFilters({ month: '', category_id: '', currency: '' });
+    const clearFilters = () => setFilters({ month: '', category_id: '', user_id: '' });
 
     const handleEdit = (expense: any) => {
         setSelectedExpense(expense);
@@ -119,15 +128,16 @@ export default function ExpensesPage() {
                         </select>
                     </div>
                     <div className="w-full space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Moneda</label>
+                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Usuario</label>
                         <select
-                            value={filters.currency}
-                            onChange={e => setFilters({ ...filters, currency: e.target.value })}
+                            value={filters.user_id}
+                            onChange={e => setFilters({ ...filters, user_id: e.target.value })}
                             className="flex h-11 w-full rounded-xl border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-medium"
                         >
-                            <option value="">Todas</option>
-                            <option value="COP">COP</option>
-                            <option value="USD">USD</option>
+                            <option value="">Todos</option>
+                            {usersList?.map((u: any) => (
+                                <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
                         </select>
                     </div>
                     <Button variant="outline" onClick={clearFilters} className="w-full sm:w-auto">

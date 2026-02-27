@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month'); // format: YYYY-MM
     const category_id = searchParams.get('category_id');
-    const currency = searchParams.get('currency');
+    const user_id = searchParams.get('user_id');
 
     let query = supabase.from('expenses').select(`*, users(name, email), categories(name)`);
 
@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
         query = query.eq('category_id', category_id);
     }
 
-    if (currency) {
-        query = query.eq('currency', currency);
+    if (user_id) {
+        query = query.eq('user_id', user_id);
     }
 
     // Order by latest primary
