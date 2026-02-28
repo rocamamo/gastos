@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,38 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { Plus, Search, Trash2, Paperclip, FilterX, Pencil } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
+
+const AttachmentLink = ({ url }: { url: string }) => {
+    const [sizeMB, setSizeMB] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchSize = async () => {
+            try {
+                const res = await fetch(url, { method: 'HEAD' });
+                const length = res.headers.get('content-length');
+                if (length) {
+                    const bytes = parseInt(length, 10);
+                    const mb = (bytes / (1024 * 1024)).toFixed(2);
+                    setSizeMB(mb);
+                }
+            } catch (err) {
+                console.error("Failed to fetch attachment size", err);
+            }
+        };
+        fetchSize();
+    }, [url]);
+
+    return (
+        <div className="flex flex-col items-center justify-center gap-1">
+            <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-full transition-colors" title="Ver adjunto">
+                <Paperclip className="h-4 w-4" />
+            </a>
+            {sizeMB && (
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{sizeMB} MB</span>
+            )}
+        </div>
+    );
+};
 
 export default function ExpensesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -215,9 +247,7 @@ export default function ExpensesPage() {
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 {expense.attachment_url ? (
-                                                    <a href={expense.attachment_url} target="_blank" rel="noopener noreferrer" className="inline-flex p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-full transition-colors" title="Ver adjunto">
-                                                        <Paperclip className="h-4 w-4" />
-                                                    </a>
+                                                    <AttachmentLink url={expense.attachment_url} />
                                                 ) : (
                                                     <span className="text-slate-300 dark:text-slate-600">-</span>
                                                 )}
