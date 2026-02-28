@@ -17,7 +17,7 @@ export default function ExpensesPage() {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedExpense, setSelectedExpense] = useState<any>(null);
     const [expenseToDelete, setExpenseToDelete] = useState<any>(null);
-    const [filters, setFilters] = useState({ month: '', category_id: '', user_id: '' });
+    const [filters, setFilters] = useState({ month: '', category_id: '', user_id: '', search: '' });
     const { user } = useAuth();
     const queryClient = useQueryClient();
 
@@ -44,6 +44,7 @@ export default function ExpensesPage() {
         if (filters.month) params.append('month', filters.month);
         if (filters.category_id) params.append('category_id', filters.category_id);
         if (filters.user_id) params.append('user_id', filters.user_id);
+        if (filters.search) params.append('search', filters.search);
 
         const res = await fetch(`/api/expenses?${params.toString()}`);
         if (!res.ok) throw new Error('Failed to fetch expenses');
@@ -83,7 +84,7 @@ export default function ExpensesPage() {
         setIsDeleteModalOpen(true);
     };
 
-    const clearFilters = () => setFilters({ month: '', category_id: '', user_id: '' });
+    const clearFilters = () => setFilters({ month: '', category_id: '', user_id: '', search: '' });
 
     const handleEdit = (expense: any) => {
         setSelectedExpense(expense);
@@ -139,6 +140,18 @@ export default function ExpensesPage() {
                                 <option key={u.id} value={u.id}>{u.name}</option>
                             ))}
                         </select>
+                    </div>
+                    <div className="w-full space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Buscar Detalle</label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Input
+                                placeholder="Escribe para buscar..."
+                                value={filters.search}
+                                onChange={e => setFilters({ ...filters, search: e.target.value })}
+                                className="pl-10"
+                            />
+                        </div>
                     </div>
                     <Button variant="outline" onClick={clearFilters} className="w-full sm:w-auto">
                         <FilterX className="h-4 w-4 mr-2" /> Limpiar

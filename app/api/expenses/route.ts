@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const month = searchParams.get('month'); // format: YYYY-MM
     const category_id = searchParams.get('category_id');
     const user_id = searchParams.get('user_id');
+    const search = searchParams.get('search');
 
     let query = supabase.from('expenses').select(`*, users(name, email), categories(name)`);
 
@@ -32,6 +33,10 @@ export async function GET(request: NextRequest) {
 
     if (user_id) {
         query = query.eq('user_id', user_id);
+    }
+
+    if (search) {
+        query = query.ilike('detail', `%${search}%`);
     }
 
     // Order by latest primary
