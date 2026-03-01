@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { MultiSelect, MonthSelect } from '@/components/ui/multi-select';
 import { ExpenseForm } from '@/components/expenses/ExpenseForm';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Plus, Search, Trash2, Paperclip, FilterX, Pencil } from 'lucide-react';
@@ -49,7 +50,10 @@ export default function ExpensesPage() {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedExpense, setSelectedExpense] = useState<any>(null);
     const [expenseToDelete, setExpenseToDelete] = useState<any>(null);
-    const [filters, setFilters] = useState({ month: '', category_id: '', user_id: '', search: '' });
+    const [selectedMonth, setSelectedMonth] = useState<string>('');
+    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+    const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+    const [searchText, setSearchText] = useState('');
     const { user } = useAuth();
     const queryClient = useQueryClient();
 
@@ -71,21 +75,22 @@ export default function ExpensesPage() {
         }
     });
 
-    const fetchExpenses = async () => {
+    const filterParams = useMemo(() => {
         const params = new URLSearchParams();
-        if (filters.month) params.append('month', filters.month);
-        if (filters.category_id) params.append('category_id', filters.category_id);
-        if (filters.user_id) params.append('user_id', filters.user_id);
-        if (filters.search) params.append('search', filters.search);
-
-        const res = await fetch(`/api/expenses?${params.toString()}`);
-        if (!res.ok) throw new Error('Failed to fetch expenses');
-        return res.json();
-    };
+        if (selectedMonth) params.append('month', selectedMonth);
+        selectedCategories.forEach(id => params.append('category_id', id));
+        selectedUsers.forEach(id => params.append('user_id', id));
+        if (searchText) params.append('search', searchText);
+        return params.toString();
+    }, [selectedMonth, selectedCategories, selectedUsers, searchText]);
 
     const { data: expenses, isLoading, isError } = useQuery({
-        queryKey: ['expenses', filters],
-        queryFn: fetchExpenses,
+        queryKey: ['expenses', filterParams],
+        queryFn: async () => {
+            const res = await fetch(`/api/expenses?${filterParams}`);
+            if (!res.ok) throw new Error('Failed to fetch expenses');
+            return res.json();
+        },
     });
 
     const deleteMutation = useMutation({
@@ -116,7 +121,14 @@ export default function ExpensesPage() {
         setIsDeleteModalOpen(true);
     };
 
-    const clearFilters = () => setFilters({ month: '', category_id: '', user_id: '', search: '' });
+    const hasFilters = selectedMonth !== '' || selectedCategories.length > 0 || selectedUsers.length > 0 || searchText !== '';
+
+    const clearFilters = () => {
+        setSelectedMonth('');
+        setSelectedCategories([]);
+        setSelectedUsers([]);
+        setSearchText('');
+    };
 
     const handleEdit = (expense: any) => {
         setSelectedExpense(expense);
@@ -141,53 +153,44 @@ export default function ExpensesPage() {
             </div>
 
             {/* Filters */}
-            <Card className="border-0 shadow-sm bg-white/60 dark:bg-slate-800/60 ring-1 ring-slate-200 dark:ring-slate-700/50">
+            <Card className="relative z-20 border-0 shadow-sm bg-white/60 dark:bg-slate-800/60 ring-1 ring-slate-200 dark:ring-slate-700/50">
                 <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row gap-4 items-end">
-                    <div className="w-full space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Mes</label>
-                        <Input type="month" value={filters.month} onChange={e => setFilters({ ...filters, month: e.target.value })} />
-                    </div>
-                    <div className="w-full space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Categoría</label>
-                        <select
-                            value={filters.category_id}
-                            onChange={e => setFilters({ ...filters, category_id: e.target.value })}
-                            className="flex h-11 w-full rounded-xl border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-medium"
-                        >
-                            <option value="">Todas</option>
-                            {categories?.map((cat: any) => (
-                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="w-full space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Usuario</label>
-                        <select
-                            value={filters.user_id}
-                            onChange={e => setFilters({ ...filters, user_id: e.target.value })}
-                            className="flex h-11 w-full rounded-xl border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 font-medium"
-                        >
-                            <option value="">Todos</option>
-                            {usersList?.map((u: any) => (
-                                <option key={u.id} value={u.id}>{u.name}</option>
-                            ))}
-                        </select>
-                    </div>
+                    <MonthSelect
+                        label="Mes"
+                        selected={selectedMonth}
+                        onChange={setSelectedMonth}
+                    />
+                    <MultiSelect
+                        label="Categoría"
+                        placeholder="Todas"
+                        options={(categories || []).map((cat: any) => ({ value: cat.id, label: cat.name }))}
+                        selected={selectedCategories}
+                        onChange={setSelectedCategories}
+                    />
+                    <MultiSelect
+                        label="Usuario"
+                        placeholder="Todos"
+                        options={(usersList || []).map((u: any) => ({ value: u.id, label: u.name }))}
+                        selected={selectedUsers}
+                        onChange={setSelectedUsers}
+                    />
                     <div className="w-full space-y-1.5">
                         <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Buscar Detalle</label>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <Input
                                 placeholder="Escribe para buscar..."
-                                value={filters.search}
-                                onChange={e => setFilters({ ...filters, search: e.target.value })}
+                                value={searchText}
+                                onChange={e => setSearchText(e.target.value)}
                                 className="pl-10"
                             />
                         </div>
                     </div>
-                    <Button variant="outline" onClick={clearFilters} className="w-full sm:w-auto">
-                        <FilterX className="h-4 w-4 mr-2" /> Limpiar
-                    </Button>
+                    {hasFilters && (
+                        <Button variant="outline" onClick={clearFilters} className="w-full sm:w-auto shrink-0">
+                            <FilterX className="h-4 w-4 mr-2" /> Limpiar
+                        </Button>
+                    )}
                 </CardContent>
             </Card>
 

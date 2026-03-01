@@ -12,27 +12,30 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const month = searchParams.get('month'); // format: YYYY-MM
-    const category_id = searchParams.get('category_id');
-    const user_id = searchParams.get('user_id');
+    const months = searchParams.getAll('month'); // format: YYYY-MM (multiple)
+    const categoryIds = searchParams.getAll('category_id'); // multiple
+    const userIds = searchParams.getAll('user_id'); // multiple
     const search = searchParams.get('search');
 
     let query = supabase.from('expenses').select(`*, users(name, email), categories(name)`);
 
-    if (month) {
-        const [year, monthNum] = month.split('-').map(Number);
-        const startDate = `${month}-01`;
-        const lastDay = new Date(year, monthNum, 0).getDate();
-        const endDate = `${month}-${lastDay}`;
-        query = query.gte('expense_date', startDate).lte('expense_date', endDate);
+    if (months.length > 0) {
+        const monthFilters = months.map(month => {
+            const [year, monthNum] = month.split('-').map(Number);
+            const startDate = `${month}-01`;
+            const lastDay = new Date(year, monthNum, 0).getDate();
+            const endDate = `${month}-${String(lastDay).padStart(2, '0')}`;
+            return `and(expense_date.gte.${startDate},expense_date.lte.${endDate})`;
+        });
+        query = query.or(monthFilters.join(','));
     }
 
-    if (category_id) {
-        query = query.eq('category_id', category_id);
+    if (categoryIds.length > 0) {
+        query = query.in('category_id', categoryIds);
     }
 
-    if (user_id) {
-        query = query.eq('user_id', user_id);
+    if (userIds.length > 0) {
+        query = query.in('user_id', userIds);
     }
 
     if (search) {

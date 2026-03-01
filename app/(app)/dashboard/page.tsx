@@ -1,51 +1,102 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { MultiSelect, MonthSelect } from '@/components/ui/multi-select';
 import { formatCurrency } from '@/lib/utils';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     AreaChart, Area,
     PieChart, Pie, Cell,
 } from 'recharts';
-import { Activity, CreditCard, DollarSign, Users } from 'lucide-react';
-import { useState } from 'react';
+import { DollarSign, CalendarDays, TrendingUp, FilterX } from 'lucide-react';
+import { useState, useMemo } from 'react';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
+const TOP5_COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#c084fc'];
 
+// ─── Dashboard Page ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
     const [currency, setCurrency] = useState<'COP' | 'USD'>('COP');
+    const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+    const [selectedMonth, setSelectedMonth] = useState<string>('');
+    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+
+    // Fetch filter options
+    const { data: usersList } = useQuery({
+        queryKey: ['users'],
+        queryFn: async () => {
+            const res = await fetch('/api/users');
+            if (!res.ok) throw new Error('Failed to fetch users');
+            return res.json();
+        }
+    });
+
+    const { data: categoriesList } = useQuery({
+        queryKey: ['categories'],
+        queryFn: async () => {
+            const res = await fetch('/api/categories');
+            if (!res.ok) throw new Error('Failed to fetch categories');
+            return res.json();
+        }
+    });
+
+    // Build query string for analytics APIs
+    const filterParams = useMemo(() => {
+        const params = new URLSearchParams();
+        selectedUsers.forEach(id => params.append('user_id', id));
+        if (selectedMonth) params.append('month', selectedMonth);
+        selectedCategories.forEach(id => params.append('category_id', id));
+        return params.toString();
+    }, [selectedUsers, selectedMonth, selectedCategories]);
+
+    const hasFilters = selectedUsers.length > 0 || selectedMonth !== '' || selectedCategories.length > 0;
 
     const { data: summary, isLoading: loadingSummary } = useQuery({
-        queryKey: ['analytics', 'summary'],
-        queryFn: () => fetch('/api/analytics/summary').then(res => res.json()),
+        queryKey: ['analytics', 'summary', filterParams],
+        queryFn: () => fetch(`/api/analytics/summary?${filterParams}`).then(res => res.json()),
+        placeholderData: keepPreviousData,
     });
 
     const { data: monthly, isLoading: loadingMonthly } = useQuery({
-        queryKey: ['analytics', 'monthly'],
-        queryFn: () => fetch('/api/analytics/monthly').then(res => res.json()),
+        queryKey: ['analytics', 'monthly', filterParams],
+        queryFn: () => fetch(`/api/analytics/monthly?${filterParams}`).then(res => res.json()),
+        placeholderData: keepPreviousData,
     });
 
     const { data: categories, isLoading: loadingCategories } = useQuery({
-        queryKey: ['analytics', 'categories'],
-        queryFn: () => fetch('/api/analytics/categories').then(res => res.json()),
+        queryKey: ['analytics', 'categories', filterParams],
+        queryFn: () => fetch(`/api/analytics/categories?${filterParams}`).then(res => res.json()),
+        placeholderData: keepPreviousData,
     });
 
     const isLoading = loadingSummary || loadingMonthly || loadingCategories;
+    const isInitialLoad = isLoading && !summary && !monthly && !categories;
 
-    if (isLoading) {
-        return (
-            <div className="flex justify-center items-center h-[60vh]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
-        );
-    }
+    const clearFilters = () => {
+        setSelectedUsers([]);
+        setSelectedMonth('');
+        setSelectedCategories([]);
+    };
 
     const valueKey = currency === 'COP' ? 'total_cop' : 'total_usd';
     const formatVal = (val: number) => formatCurrency(val, currency);
     const formatTick = (val: number) => new Intl.NumberFormat('es-CO', {
         maximumFractionDigits: 0
     }).format(val);
+
+    // Top 5 categories
+    const top5Categories = (categories || []).slice(0, 5);
+
+
+    if (isInitialLoad) {
+        return (
+            <div className="flex justify-center items-center h-[60vh]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 pb-10">
@@ -70,8 +121,39 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {/* ───── Multi-select Filters ───── */}
+            <Card className="relative z-20 border-0 shadow-sm bg-white/60 dark:bg-slate-800/60 ring-1 ring-slate-200 dark:ring-slate-700/50">
+                <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row gap-4 items-end">
+                    <MultiSelect
+                        label="Usuario"
+                        placeholder="Todos"
+                        options={(usersList || []).map((u: any) => ({ value: u.id, label: u.name }))}
+                        selected={selectedUsers}
+                        onChange={setSelectedUsers}
+                    />
+                    <MonthSelect
+                        label="Mes"
+                        selected={selectedMonth}
+                        onChange={setSelectedMonth}
+                    />
+                    <MultiSelect
+                        label="Categoría"
+                        placeholder="Todas"
+                        options={(categoriesList || []).map((c: any) => ({ value: c.id, label: c.name }))}
+                        selected={selectedCategories}
+                        onChange={setSelectedCategories}
+                    />
+                    {hasFilters && (
+                        <Button variant="outline" onClick={clearFilters} className="w-full sm:w-auto shrink-0">
+                            <FilterX className="h-4 w-4 mr-2" /> Limpiar
+                        </Button>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* ───── KPI Cards ───── */}
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {/* Total Gastado */}
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-semibold text-slate-500 dark:text-slate-400">Total Gastado</CardTitle>
@@ -83,41 +165,58 @@ export default function DashboardPage() {
                         <div className="text-2xl font-bold text-slate-900 dark:text-white">{summary ? formatVal(summary[valueKey]) : '$0'}</div>
                     </CardContent>
                 </Card>
+
+                {/* Promedio por Mes */}
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-semibold text-slate-500 dark:text-slate-400">Promedio por Persona</CardTitle>
+                        <CardTitle className="text-sm font-semibold text-slate-500 dark:text-slate-400">Promedio por Mes</CardTitle>
                         <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                            <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            <CalendarDays className="h-4 w-4 text-green-600 dark:text-green-400" />
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-slate-900 dark:text-white">{summary ? formatVal(currency === 'COP' ? summary.average_cop : summary.average_usd) : '$0'}</div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                            {summary ? formatVal(currency === 'COP' ? summary.monthly_average_cop : summary.monthly_average_usd) : '$0'}
+                        </div>
                     </CardContent>
                 </Card>
-                <Card>
+
+                {/* Top 5 Categorías */}
+                <Card className="sm:col-span-2 lg:col-span-1">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-semibold text-slate-500 dark:text-slate-400">Total Transacciones</CardTitle>
+                        <CardTitle className="text-sm font-semibold text-slate-500 dark:text-slate-400">Top 5 Categorías</CardTitle>
                         <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
-                            <CreditCard className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                            <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                            {summary ? summary.by_person.reduce((acc: number, p: any) => acc + p.count, 0) : 0}
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-semibold text-slate-500 dark:text-slate-400">Categoría Mayor</CardTitle>
-                        <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
-                            <Activity className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                            {categories && categories.length > 0 ? categories[0].category : 'N/A'}
-                        </div>
+                        {top5Categories.length > 0 ? (
+                            <div className="space-y-2.5">
+                                {top5Categories.map((cat: any, idx: number) => {
+                                    const maxVal = top5Categories[0]?.[valueKey] || 1;
+                                    const pct = (cat[valueKey] / maxVal) * 100;
+                                    return (
+                                        <div key={cat.category} className="flex items-center gap-3">
+                                            <span className="text-xs font-bold text-slate-400 w-4 text-right">{idx + 1}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between mb-0.5">
+                                                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">{cat.category}</span>
+                                                    <span className="text-xs font-bold text-slate-900 dark:text-white ml-2 shrink-0">{formatVal(cat[valueKey])}</span>
+                                                </div>
+                                                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-500"
+                                                        style={{ width: `${pct}%`, backgroundColor: TOP5_COLORS[idx] }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-slate-400">Sin datos</p>
+                        )}
                     </CardContent>
                 </Card>
             </div>
