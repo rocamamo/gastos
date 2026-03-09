@@ -66,8 +66,34 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const validatedData = expenseSchema.parse(body);
 
+        const { data: category } = await supabase
+            .from('categories')
+            .select('name')
+            .eq('id', validatedData.category_id)
+            .single();
+
         const rate = await getExchangeRate(validatedData.expense_date);
         const converted = convertCurrency(validatedData.amount, validatedData.currency, rate);
+
+        let amount_divided_cop = 0;
+        let amount_divided_usd = 0;
+        let amount_divided_3_cop = 0;
+        let amount_divided_3_usd = 0;
+        let amount_divided_4_cop = 0;
+        let amount_divided_4_usd = 0;
+
+        if (category) {
+            if (['Mercado', 'Restaurantes', 'Servicios Públicos'].includes(category.name)) {
+                amount_divided_4_cop = Number((converted.amount_cop / 4).toFixed(2));
+                amount_divided_4_usd = Number((converted.amount_usd / 4).toFixed(2));
+            } else if (['Medicos', 'Médicos'].includes(category.name)) {
+                amount_divided_3_cop = Number((converted.amount_cop / 3).toFixed(2));
+                amount_divided_3_usd = Number((converted.amount_usd / 3).toFixed(2));
+            } else {
+                amount_divided_cop = Number((converted.amount_cop / 2).toFixed(2));
+                amount_divided_usd = Number((converted.amount_usd / 2).toFixed(2));
+            }
+        }
 
         const { data, error } = await supabase.from('expenses').insert({
             user_id: user.id,
@@ -77,6 +103,12 @@ export async function POST(request: NextRequest) {
             currency: validatedData.currency,
             amount_cop: converted.amount_cop,
             amount_usd: converted.amount_usd,
+            amount_divided_cop,
+            amount_divided_usd,
+            amount_divided_3_cop,
+            amount_divided_3_usd,
+            amount_divided_4_cop,
+            amount_divided_4_usd,
             expense_date: validatedData.expense_date,
             attachment_url: validatedData.attachment_url || null,
         }).select().single();

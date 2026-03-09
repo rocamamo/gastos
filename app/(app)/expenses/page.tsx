@@ -224,7 +224,10 @@ export default function ExpensesPage() {
                                         <th scope="col" className="px-6 py-4 font-semibold">Usuario</th>
                                         <th scope="col" className="px-6 py-4 font-semibold">Categoría</th>
                                         <th scope="col" className="px-6 py-4 font-semibold">Detalle</th>
-                                        <th scope="col" className="px-6 py-4 font-semibold text-right">Monto (COP/USD)</th>
+                                        <th scope="col" className="px-6 py-4 font-semibold text-right">Monto Total (COP/USD)</th>
+                                        <th scope="col" className="px-6 py-4 font-semibold text-right">Monto ÷ 2 (COP/USD)</th>
+                                        <th scope="col" className="px-6 py-4 font-semibold text-right">Monto ÷ 3 (COP/USD)</th>
+                                        <th scope="col" className="px-6 py-4 font-semibold text-right">Monto ÷ 4 (COP/USD)</th>
                                         <th scope="col" className="px-6 py-4 font-semibold text-center">Adjunto</th>
                                         <th scope="col" className="px-6 py-4 font-semibold text-right rounded-tr-xl">Acciones</th>
                                     </tr>
@@ -246,6 +249,30 @@ export default function ExpensesPage() {
                                                 </div>
                                                 <div className="text-xs text-slate-500 mt-0.5">
                                                     {formatCurrency(Number(expense.amount_usd), 'USD')}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="font-medium text-slate-800 dark:text-slate-200">
+                                                    {formatCurrency(Number(expense.amount_divided_cop || 0), 'COP')}
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-0.5">
+                                                    {formatCurrency(Number(expense.amount_divided_usd || 0), 'USD')}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="font-medium text-slate-800 dark:text-slate-200">
+                                                    {formatCurrency(Number(expense.amount_divided_3_cop || 0), 'COP')}
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-0.5">
+                                                    {formatCurrency(Number(expense.amount_divided_3_usd || 0), 'USD')}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="font-medium text-slate-800 dark:text-slate-200">
+                                                    {formatCurrency(Number(expense.amount_divided_4_cop || 0), 'COP')}
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-0.5">
+                                                    {formatCurrency(Number(expense.amount_divided_4_usd || 0), 'USD')}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
@@ -289,6 +316,30 @@ export default function ExpensesPage() {
                                             </div>
                                             <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
                                                 {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_usd), 0) || 0, 'USD')}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="text-slate-800 dark:text-slate-200 font-medium">
+                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_cop || 0), 0) || 0, 'COP')}
+                                            </div>
+                                            <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_usd || 0), 0) || 0, 'USD')}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="text-slate-800 dark:text-slate-200 font-medium">
+                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_3_cop || 0), 0) || 0, 'COP')}
+                                            </div>
+                                            <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_3_usd || 0), 0) || 0, 'USD')}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="text-slate-800 dark:text-slate-200 font-medium">
+                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_4_cop || 0), 0) || 0, 'COP')}
+                                            </div>
+                                            <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_4_usd || 0), 0) || 0, 'USD')}
                                             </div>
                                         </td>
                                         <td colSpan={2}></td>
