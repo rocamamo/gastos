@@ -20,6 +20,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
 
     useEffect(() => {
+        if (typeof window !== 'undefined' && (window as Window & { __E2E_USER_ID__?: string }).__E2E_USER_ID__) {
+            const id = (window as Window & { __E2E_USER_ID__: string }).__E2E_USER_ID__;
+            setUser({
+                id,
+                email: 'e2e@local.test',
+                aud: 'authenticated',
+                role: 'authenticated',
+                app_metadata: {},
+                user_metadata: {},
+                created_at: new Date().toISOString(),
+            } as User);
+            setProfile({ id, name: 'Usuario E2E', email: 'e2e@local.test', role: 'user' });
+            setIsLoading(false);
+            return;
+        }
+
         const fetchSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             setUser(session?.user ?? null);

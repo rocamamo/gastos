@@ -1,4 +1,10 @@
+import path from 'path';
 import { defineConfig, devices } from '@playwright/test';
+
+/** Binarios dentro del repo (gitignored vía node_modules) para CI y entornos sin caché global. */
+if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+    process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(__dirname, 'node_modules', '.cache', 'playwright');
+}
 
 const PORT = 3003;
 const baseURL = `http://127.0.0.1:${PORT}`;
@@ -31,7 +37,8 @@ export default defineConfig({
         command: 'npm run dev',
         url: `${baseURL}/login`,
         timeout: 150_000,
-        reuseExistingServer: !process.env.CI,
+        /** Si ya hay `next dev` en :3003 se reutiliza; si no, Playwright arranca uno (mismo lock `.next`). */
+        reuseExistingServer: true,
         env: webServerEnv,
         stdout: 'pipe',
         stderr: 'pipe',

@@ -8,8 +8,9 @@
     "start": "next start -p 3003",
     "lint": "eslint",
     "test": "npx jest",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=\"$INIT_CWD/node_modules/.cache/playwright\" playwright test",
+    "test:e2e:ui": "PLAYWRIGHT_BROWSERS_PATH=\"$INIT_CWD/node_modules/.cache/playwright\" playwright test --ui",
+    "playwright:install": "mkdir -p node_modules/.cache/playwright && PLAYWRIGHT_BROWSERS_PATH=\"$INIT_CWD/node_modules/.cache/playwright\" npx playwright install chromium"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

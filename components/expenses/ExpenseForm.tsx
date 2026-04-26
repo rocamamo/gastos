@@ -48,18 +48,19 @@ export function ExpenseForm({
         defaultValues: {
             currency: initialData?.currency || 'COP',
             expense_date: initialData?.expense_date || new Date().toISOString().split('T')[0],
-            amount: initialData?.amount || 0,
+            amount: initialData?.amount ?? initialData?.amount_cop ?? 0,
             category_id: initialData?.category_id || '',
             detail: initialData?.detail || '',
         },
     });
 
     useEffect(() => {
-        if (initialData?.amount) {
+        const amountForDisplay = initialData?.amount ?? initialData?.amount_cop;
+        if (amountForDisplay) {
             const formatted = new Intl.NumberFormat('es-CO', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
-            }).format(initialData.amount);
+            }).format(amountForDisplay);
             setDisplayAmount(formatted);
         }
     }, [initialData]);

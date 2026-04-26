@@ -2,39 +2,45 @@
 
 ## Marco detectado
 
-- **Unit / integración API (Jest + `next/jest`):** `__tests__/**/*.test.ts` — ya existía; se excluye `e2e/` del runner de Jest.
-- **E2E contra servidor real (Playwright):** carpeta `e2e/`, arranque automático con `npm run dev` en **puerto 3003** (`playwright.config.ts`).
+- **Unit / integración API (Jest + `next/jest`):** `__tests__/**/*.test.ts` — se excluye `e2e/` del runner de Jest.
+- **E2E (Playwright):** carpeta `e2e/`, `npm run dev` en **:3003**; binarios en `node_modules/.cache/playwright` (`PLAYWRIGHT_BROWSERS_PATH` en script `npm run test:e2e`). Instalación: `npm run playwright:install`.
+
+## Estrategia CRUD gastos **sin tocar Supabase / producción**
+
+- **Mocks de red** (`page.route`): respuestas sintéticas para `GET/POST/PATCH/DELETE` bajo `/api/expenses*`, `GET /api/categories`, `GET /api/users`, `GET /api/exchange-rate*`, y `GET **/rest/v1/categories**` (el formulario lee categorías con el cliente Supabase).
+- **Bypass solo en desarrollo:** cookie `pw-e2e=1` + `NODE_ENV !== 'production'` en `lib/supabase/middleware.ts` (no aplica en `next start` / producción).
+- **Usuario simulado en cliente:** `window.__E2E_USER_ID__` vía `addInitScript` + `hooks/use-auth.tsx` (sin suscripción a `onAuthStateChange` en ese modo, para que no pise el usuario mock).
 
 ## Pruebas generadas / actualizadas
 
 ### API (Jest, mocks)
 
-- [x] `__tests__/api/expenses.route.test.ts` — validación `per_page`, respuesta paginada + totales, valores no finitos en columnas monetarias.
-- [x] `__tests__/services/currency.test.ts` — conversión COP/USD (existente).
+- [x] `__tests__/api/expenses.route.test.ts`
+- [x] `__tests__/services/currency.test.ts`
 
-### E2E backend + “frontend” HTTP (Playwright `request`, sin UI Chromium)
+### E2E (Playwright)
 
-- [x] `e2e/api-backend.spec.ts` — `GET /api/docs-json` (OpenAPI 3.0), `GET /api/exchange-rate` (`rate` finito), rutas protegidas sin cookie → **401** + `{ error: 'Unauthorized' }` (muestra representativa de la API: `me`, `users`, `categories`, `expenses`, analytics, `POST/PATCH/DELETE` gastos, `POST` upload).
-- [x] `e2e/app-http.spec.ts` — redirecciones `/` → login, `/dashboard` y `/expenses` sin sesión → login; HTML de `/login` y `/docs` (smoke sin ejecutar JavaScript del cliente).
+- [x] `e2e/api-backend.spec.ts` — OpenAPI, `exchange-rate`, 401 en rutas con auth.
+- [x] `e2e/app-http.spec.ts` — redirecciones y HTML público vía `request`.
+- [x] `e2e/expenses-crud.spec.ts` — **CRUD UI en `/expenses`** con mocks (crear, editar detalle, eliminar con confirmación, listado + paginación página 2).
 
-### E2E UI con Chromium (clics, DOM)
+### Corrección de producto detectada por E2E
 
-- [ ] No incluido por defecto: en algunos entornos (p. ej. sandbox) **Chromium headless puede fallar con SIGSEGV**; las comprobaciones equivalentes de rutas públicas/protegidas están cubiertas por **`app-http.spec.ts`** vía HTTP.
+- [x] `components/expenses/ExpenseForm.tsx` — en edición el API envía `amount_cop`; el formulario usaba solo `initialData.amount` (0) y Zod bloqueaba el envío. Ahora usa `amount ?? amount_cop`.
 
 ## Cobertura (orientativa)
 
-| Área | Cobertura en esta pasada |
-|------|---------------------------|
-| Rutas App Router listadas en el repo (`/`, `/login`, `/dashboard`, `/expenses`, `/docs`) | Smoke HTTP + redirecciones auth |
-| API bajo `/api/*` | Contrato público (`docs-json`, `exchange-rate`) + **401** uniforme en rutas con sesión obligatoria (lista anterior) |
-| Flujos autenticados (dashboard con datos, CRUD gastos en UI) | **No** — requieren sesión real (p. ej. `storageState` tras login Google o usuario de prueba + credenciales en `.env` no versionado). |
+| Área | Cobertura |
+|------|-----------|
+| CRUD gastos en UI | Crear / editar / eliminar / listar + paginación (todo con datos en memoria del mock) |
+| API real con sesión | No (siguen los smoke 401 + contratos públicos) |
 
 ## Comandos ejecutados (verificación)
 
-- `npm test` — **PASS** (5 pruebas Jest).
-- `npm run test:e2e` — **PASS** (8 pruebas Playwright).
+- `npm test` — **PASS**
+- `npm run test:e2e` — **PASS** (12 pruebas Playwright)
 
 ## Próximos pasos sugeridos
 
-- Añadir en CI: `npm test` y `npm run test:e2e` (Playwright instala Chromium en el runner con `npx playwright install --with-deps chromium`).
-- Para E2E **con sesión** en dashboard/expenses: definir estrategia (usuario de prueba Supabase, o `storageState` generado localmente) y ampliar `e2e/` con pruebas basadas en `page` (Chromium estable en máquina local / CI estándar).
+- CI: `npm run playwright:install` (o `npx playwright install chromium`) y luego `npm run test:e2e`.
+- Si en local ya tienes `next dev` en 3003, Playwright **reutiliza** ese proceso (`reuseExistingServer: true`); no hace falta variable `E2E_TEST` en el servidor (el bypass depende de `NODE_ENV` + cookie de test).

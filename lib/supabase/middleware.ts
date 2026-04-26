@@ -35,11 +35,19 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
+    /**
+     * Playwright E2E (sin tocar Supabase): solo en desarrollo (`next dev`) y con cookie
+     * `pw-e2e=1` (la fija el test). En `production` nunca aplica.
+     */
+    const e2eBypass =
+        process.env.NODE_ENV !== 'production' &&
+        request.cookies.get('pw-e2e')?.value === '1'
+
     // Protect routes - example for dashboard/expenses 
     const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') ||
         request.nextUrl.pathname.startsWith('/expenses')
 
-    if (isProtectedRoute && !user) {
+    if (isProtectedRoute && !user && !e2eBypass) {
         // no user, potentially respond by redirecting the user to the login page
         const url = request.nextUrl.clone()
         url.pathname = '/login'
