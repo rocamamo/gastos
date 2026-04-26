@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,54 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { Plus, Search, Trash2, Paperclip, FilterX, Pencil } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
+
+const ALLOWED_PER_PAGE = new Set([10, 20, 50]);
+const DEFAULT_PER_PAGE = 20;
+
+function parsePositiveInt(value: string | null): number | null {
+    if (!value) return null;
+    if (!/^\d+$/.test(value)) return null;
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed) || parsed < 1) return null;
+    return parsed;
+}
+
+type ExpenseRow = {
+    id: string;
+    user_id: string;
+    category_id: string;
+    expense_date: string;
+    detail: string;
+    amount_cop: number;
+    amount_usd: number;
+    amount_divided_cop?: number | null;
+    amount_divided_usd?: number | null;
+    amount_divided_3_cop?: number | null;
+    amount_divided_3_usd?: number | null;
+    amount_divided_4_cop?: number | null;
+    amount_divided_4_usd?: number | null;
+    attachment_url?: string | null;
+    users?: { name?: string | null } | null;
+    categories?: { name?: string | null } | null;
+};
+
+type ExpensesApiResponse = {
+    data: ExpenseRow[];
+    pagination: { total: number; page: number; per_page: number; total_pages: number };
+    totals: {
+        amount_cop: number;
+        amount_usd: number;
+        amount_divided_cop: number;
+        amount_divided_usd: number;
+        amount_divided_3_cop: number;
+        amount_divided_3_usd: number;
+        amount_divided_4_cop: number;
+        amount_divided_4_usd: number;
+    };
+};
+
+type Category = { id: string; name: string };
+type UserListItem = { id: string; name: string };
 
 const AttachmentLink = ({ url }: { url: string }) => {
     const [sizeMB, setSizeMB] = useState<string | null>(null);
@@ -48,16 +97,26 @@ const AttachmentLink = ({ url }: { url: string }) => {
 export default function ExpensesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [selectedExpense, setSelectedExpense] = useState<any>(null);
-    const [expenseToDelete, setExpenseToDelete] = useState<any>(null);
+    const [selectedExpense, setSelectedExpense] = useState<ExpenseRow | null>(null);
+    const [expenseToDelete, setExpenseToDelete] = useState<ExpenseRow | null>(null);
     const [selectedMonth, setSelectedMonth] = useState<string>('');
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
     const [searchText, setSearchText] = useState('');
     const { user } = useAuth();
     const queryClient = useQueryClient();
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
 
-    const { data: categories } = useQuery({
+    const page = useMemo(() => parsePositiveInt(searchParams.get('page')) ?? 1, [searchParams]);
+    const perPageFromUrl = useMemo(() => parsePositiveInt(searchParams.get('per_page')), [searchParams]);
+    const per_page = useMemo(() => {
+        const candidate = perPageFromUrl ?? DEFAULT_PER_PAGE;
+        return ALLOWED_PER_PAGE.has(candidate) ? candidate : DEFAULT_PER_PAGE;
+    }, [perPageFromUrl]);
+
+    const { data: categories } = useQuery<Category[]>({
         queryKey: ['categories'],
         queryFn: async () => {
             const res = await fetch('/api/categories');
@@ -66,7 +125,7 @@ export default function ExpensesPage() {
         }
     });
 
-    const { data: usersList } = useQuery({
+    const { data: usersList } = useQuery<UserListItem[]>({
         queryKey: ['users'],
         queryFn: async () => {
             const res = await fetch('/api/users');
@@ -74,6 +133,21 @@ export default function ExpensesPage() {
             return res.json();
         }
     });
+
+    // Initialize filter state from URL (deep links + back/forward support).
+    useEffect(() => {
+        const month = searchParams.get('month') ?? '';
+        const categoryIds = searchParams.getAll('category_id');
+        const userIds = searchParams.getAll('user_id');
+        const search = searchParams.get('search') ?? '';
+
+        // Only set when different to avoid loops.
+        setSelectedMonth((prev) => (prev === month ? prev : month));
+        setSelectedCategories((prev) => (prev.join('|') === categoryIds.join('|') ? prev : categoryIds));
+        setSelectedUsers((prev) => (prev.join('|') === userIds.join('|') ? prev : userIds));
+        setSearchText((prev) => (prev === search ? prev : search));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams.toString()]);
 
     const filterParams = useMemo(() => {
         const params = new URLSearchParams();
@@ -84,14 +158,97 @@ export default function ExpensesPage() {
         return params.toString();
     }, [selectedMonth, selectedCategories, selectedUsers, searchText]);
 
-    const { data: expenses, isLoading, isError } = useQuery({
-        queryKey: ['expenses', filterParams],
+    // Debounce URL updates for search to avoid rewriting on every keypress.
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            setFiltersInUrl({ search: searchText });
+        }, 350);
+        return () => clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchText]);
+
+    const listParams = useMemo(() => {
+        const params = new URLSearchParams(filterParams);
+        params.set('page', String(page));
+        params.set('per_page', String(per_page));
+        return params.toString();
+    }, [filterParams, page, per_page]);
+
+    const { data: expensesResponse, isLoading, isError, isFetching } = useQuery<ExpensesApiResponse>({
+        queryKey: ['expenses', filterParams, page, per_page],
         queryFn: async () => {
-            const res = await fetch(`/api/expenses?${filterParams}`);
+            const res = await fetch(`/api/expenses?${listParams}`);
             if (!res.ok) throw new Error('Failed to fetch expenses');
             return res.json();
         },
+        placeholderData: keepPreviousData,
     });
+
+    const expenses = expensesResponse?.data ?? [];
+    const pagination = expensesResponse?.pagination ?? { total: 0, page, per_page, total_pages: 0 };
+    const totals = expensesResponse?.totals ?? {
+        amount_cop: 0,
+        amount_usd: 0,
+        amount_divided_cop: 0,
+        amount_divided_usd: 0,
+        amount_divided_3_cop: 0,
+        amount_divided_3_usd: 0,
+        amount_divided_4_cop: 0,
+        amount_divided_4_usd: 0,
+    };
+
+    const setPaginationInUrl = (next: { page?: number; per_page?: number }) => {
+        const params = new URLSearchParams(searchParams.toString());
+        const nextPage = next.page ?? page;
+        const nextPerPage = next.per_page ?? per_page;
+
+        params.set('page', String(nextPage));
+        params.set('per_page', String(nextPerPage));
+
+        // keep URL clean when defaults
+        if (nextPage === 1) params.delete('page');
+        if (nextPerPage === DEFAULT_PER_PAGE) params.delete('per_page');
+
+        const qs = params.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname);
+    };
+
+    const setFiltersInUrl = (next: {
+        month?: string;
+        categoryIds?: string[];
+        userIds?: string[];
+        search?: string;
+    }) => {
+        const params = new URLSearchParams(searchParams.toString());
+
+        const month = next.month ?? selectedMonth;
+        const categoryIds = next.categoryIds ?? selectedCategories;
+        const userIds = next.userIds ?? selectedUsers;
+        const search = next.search ?? searchText;
+
+        // month
+        if (month) params.set('month', month);
+        else params.delete('month');
+
+        // multi
+        params.delete('category_id');
+        categoryIds.forEach((id) => params.append('category_id', id));
+        params.delete('user_id');
+        userIds.forEach((id) => params.append('user_id', id));
+
+        // search
+        if (search) params.set('search', search);
+        else params.delete('search');
+
+        // filter change => page 1
+        params.delete('page');
+
+        // keep per_page clean when default
+        if (per_page === DEFAULT_PER_PAGE) params.delete('per_page');
+
+        const qs = params.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname);
+    };
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
@@ -106,12 +263,12 @@ export default function ExpensesPage() {
             setIsDeleteModalOpen(false);
             setExpenseToDelete(null);
         },
-        onError: (error: any) => {
-            toast.error(error.message);
+        onError: (error: unknown) => {
+            toast.error(error instanceof Error ? error.message : 'Error eliminando el gasto');
         }
     });
 
-    const handleDelete = (expense: any) => {
+    const handleDelete = (expense: ExpenseRow) => {
         if (user?.id !== expense.user_id) {
             toast.error('Solo el creador puede eliminar este gasto.');
             return;
@@ -128,9 +285,10 @@ export default function ExpensesPage() {
         setSelectedCategories([]);
         setSelectedUsers([]);
         setSearchText('');
+        setFiltersInUrl({ month: '', categoryIds: [], userIds: [], search: '' });
     };
 
-    const handleEdit = (expense: any) => {
+    const handleEdit = (expense: ExpenseRow) => {
         setSelectedExpense(expense);
         setIsModalOpen(true);
     };
@@ -158,21 +316,30 @@ export default function ExpensesPage() {
                     <MonthSelect
                         label="Mes"
                         selected={selectedMonth}
-                        onChange={setSelectedMonth}
+                        onChange={(m) => {
+                            setSelectedMonth(m);
+                            setFiltersInUrl({ month: m });
+                        }}
                     />
                     <MultiSelect
                         label="Categoría"
                         placeholder="Todas"
-                        options={(categories || []).map((cat: any) => ({ value: cat.id, label: cat.name }))}
+                        options={(categories || []).map((cat) => ({ value: cat.id, label: cat.name }))}
                         selected={selectedCategories}
-                        onChange={setSelectedCategories}
+                        onChange={(ids) => {
+                            setSelectedCategories(ids);
+                            setFiltersInUrl({ categoryIds: ids });
+                        }}
                     />
                     <MultiSelect
                         label="Usuario"
                         placeholder="Todos"
-                        options={(usersList || []).map((u: any) => ({ value: u.id, label: u.name }))}
+                        options={(usersList || []).map((u) => ({ value: u.id, label: u.name }))}
                         selected={selectedUsers}
-                        onChange={setSelectedUsers}
+                        onChange={(ids) => {
+                            setSelectedUsers(ids);
+                            setFiltersInUrl({ userIds: ids });
+                        }}
                     />
                     <div className="w-full space-y-1.5">
                         <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Buscar Detalle</label>
@@ -233,7 +400,7 @@ export default function ExpensesPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                                    {expenses?.map((expense: any) => (
+                                    {expenses?.map((expense: ExpenseRow) => (
                                         <tr key={expense.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors">
                                             <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-200">{formatDate(expense.expense_date)}</td>
                                             <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{expense.users?.name || 'Usuario'}</td>
@@ -312,34 +479,34 @@ export default function ExpensesPage() {
                                         <td colSpan={4} className="px-6 py-4 text-slate-900 dark:text-white text-right">TOTAL</td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="text-slate-900 dark:text-white">
-                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_cop), 0) || 0, 'COP')}
+                                                {formatCurrency(Number(totals.amount_cop) || 0, 'COP')}
                                             </div>
                                             <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_usd), 0) || 0, 'USD')}
+                                                {formatCurrency(Number(totals.amount_usd) || 0, 'USD')}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="text-slate-800 dark:text-slate-200 font-medium">
-                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_cop || 0), 0) || 0, 'COP')}
+                                                {formatCurrency(Number(totals.amount_divided_cop) || 0, 'COP')}
                                             </div>
                                             <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_usd || 0), 0) || 0, 'USD')}
+                                                {formatCurrency(Number(totals.amount_divided_usd) || 0, 'USD')}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="text-slate-800 dark:text-slate-200 font-medium">
-                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_3_cop || 0), 0) || 0, 'COP')}
+                                                {formatCurrency(Number(totals.amount_divided_3_cop) || 0, 'COP')}
                                             </div>
                                             <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_3_usd || 0), 0) || 0, 'USD')}
+                                                {formatCurrency(Number(totals.amount_divided_3_usd) || 0, 'USD')}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="text-slate-800 dark:text-slate-200 font-medium">
-                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_4_cop || 0), 0) || 0, 'COP')}
+                                                {formatCurrency(Number(totals.amount_divided_4_cop) || 0, 'COP')}
                                             </div>
                                             <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-                                                {formatCurrency(expenses?.reduce((acc: number, curr: any) => acc + Number(curr.amount_divided_4_usd || 0), 0) || 0, 'USD')}
+                                                {formatCurrency(Number(totals.amount_divided_4_usd) || 0, 'USD')}
                                             </div>
                                         </td>
                                         <td colSpan={2}></td>
@@ -350,6 +517,63 @@ export default function ExpensesPage() {
                     </div>
                 )}
             </div>
+
+            {/* Pagination Controls */}
+            {!isLoading && !isError && pagination.total > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="text-sm text-slate-600 dark:text-slate-300">
+                        {(() => {
+                            const from = (pagination.page - 1) * pagination.per_page + 1;
+                            const to = Math.min(pagination.page * pagination.per_page, pagination.total);
+                            return (
+                                <span>
+                                    Mostrando <span className="font-semibold">{from}</span>–<span className="font-semibold">{to}</span> de{' '}
+                                    <span className="font-semibold">{pagination.total}</span>
+                                    {isFetching ? <span className="ml-2 text-xs text-slate-400">(actualizando…)</span> : null}
+                                </span>
+                            );
+                        })()}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Por página</span>
+                            <select
+                                value={per_page}
+                                onChange={(e) => {
+                                    const next = Number(e.target.value);
+                                    setPaginationInUrl({ per_page: next, page: 1 });
+                                }}
+                                className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-sm"
+                            >
+                                {[10, 20, 50].map((n) => (
+                                    <option key={n} value={n}>{n}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => setPaginationInUrl({ page: Math.max(1, page - 1) })}
+                                disabled={page <= 1}
+                            >
+                                Anterior
+                            </Button>
+                            <div className="text-sm text-slate-700 dark:text-slate-200">
+                                Página <span className="font-semibold">{pagination.page}</span> de <span className="font-semibold">{pagination.total_pages || 1}</span>
+                            </div>
+                            <Button
+                                variant="outline"
+                                onClick={() => setPaginationInUrl({ page: Math.min(pagination.total_pages || 1, page + 1) })}
+                                disabled={pagination.total_pages === 0 || page >= pagination.total_pages}
+                            >
+                                Siguiente
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <Modal
                 isOpen={isModalOpen}
@@ -403,8 +627,8 @@ export default function ExpensesPage() {
                         <Button
                             variant="destructive"
                             className="flex-1 bg-red-600 hover:bg-red-700"
-                            onClick={() => deleteMutation.mutate(expenseToDelete.id)}
-                            disabled={deleteMutation.isPending}
+                            onClick={() => expenseToDelete && deleteMutation.mutate(expenseToDelete.id)}
+                            disabled={deleteMutation.isPending || !expenseToDelete}
                         >
                             {deleteMutation.isPending ? 'Eliminando...' : 'Sí, eliminar'}
                         </Button>
