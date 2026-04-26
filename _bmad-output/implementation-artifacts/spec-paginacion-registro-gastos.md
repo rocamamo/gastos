@@ -60,13 +60,29 @@ context:
 - Dado un cambio de filtro (mes, categoría, usuario o búsqueda), la lista vuelve a la página 1 y la refleja en la URL.
 - Dada una petición con `per_page` no permitido, el servidor responde 400 o aplica un valor por defecto documentado (una sola política, consistente en código y spec).
 
+### Review Findings
+
+- [x] [Review][Decision] Totales por lotes sin snapshot ni `ORDER BY` estable — bajo escrituras concurrentes los `range` pueden omitir o duplicar filas entre chunks; además la suma ocupa más tiempo que un agregado SQL y corre en paralelo con la query paginada, ampliando la ventana donde lista y totales no corresponden al mismo estado de BD. (`app/api/expenses/route.ts`) — **Resuelto 2026-04-26:** mantener simplicidad; documentar el matiz en `docs/api-contracts.md` y Design Notes (no habilitar agregados PostgREST ni complicar con snapshot/RPC para el volumen típico).
+
+- [x] [Review][Decision] Tensión con Design Notes (congelado): el spec pide agregación “sin traer todas las filas al Node solo para sumar si el volumen puede crecer”; el fix `9f14d01` trae filas en lotes al Node para acumular. Hay que decidir: aceptar este trade-off y ajustar texto fuera de `<frozen-after-approval>`, habilitar agregados PostgREST en el proyecto, o usar RPC/SQL de suma única. — **Resuelto 2026-04-26 (opción A):** comportamiento actual; texto **fuera** del bloque congelado actualizado para reflejar suma en lotes en Node y el trade-off frente a agregados SQL.
+
+- [x] [Review][Patch] Acumulación `+= Number(...)` sin comprobar finitud — valores no numéricos en columnas monetarias pueden producir `NaN` y contaminar todos los totales. `app/api/expenses/route.ts:123` — **Resuelto:** acumulación con `addFinite` (solo suma si `Number.isFinite`).
+
+- [x] [Review][Defer] Ventana lista/totales con `Promise.all` ya existía antes del fix; el nuevo camino multi-round-trip agranda el intervalo pero no introduce el patrón en sí. — deferred, pre-existing
+
+- [x] [Review][Defer] Precisión float JS vs `numeric` en Postgres al sumar muchas filas — riesgo de dominio menor frente a un único `sum()` en BD. — deferred, pre-existing
+
+- [x] [Review][Defer] Hallazgos del auditor sobre URL/`per_page`/tests (p. ej. coerción UI vs 400) no forman parte del diff `15284e7..9f14d01` (solo `route.ts` + doc). — deferred, fuera del alcance de este commit
+
 ## Spec Change Log
+
+- **2026-04-26:** Cierre de revisión post-`9f14d01`: decisiones usuario — no complicar el sistema (documentar consistencia bajo concurrencia rara); opción A (mantener suma en lotes en Node y alinear Design Notes + contrato API). Parche `addFinite` en totales.
 
 ## Design Notes
 
 - **Volumen ~120/mes:** `per_page` por defecto **20**; selector **10 / 20 / 50** en la UI. Con ~6 páginas al mes a 20, equilibrio entre clicks y legibilidad.
 - **URL:** `page` y `per_page` en la query (junto a filtros existentes) para compartir enlace y botón atrás; al compartir solo filtros, `page` puede omitirse (interpretar como 1).
-- **Agregación:** Misma lógica de `WHERE` que el listado; implementar con consultas/funciones soportadas por el proyecto (Supabase) sin traer todas las filas al Node solo para sumar si el volumen puede crecer.
+- **Agregación:** Misma lógica de `WHERE` que el listado. Hoy el proyecto no usa agregados PostgREST (`sum()`); los totales se acumulan en Node leyendo columnas de importe en **lotes** (p. ej. 1000 filas por round-trip). Con volumen típico (~120/mes) es aceptable; si el volumen crece mucho o se exige suma idéntica a una sola transacción SQL, valorar agregados habilitados o RPC. Bajo muchas escrituras concurrentes, lista y totales pueden no ser una foto única perfecta de la BD (documentado en contrato).
 - **React Query:** Incluir `page` y `per_page` en `queryKey` junto a la cadena de filtros; invalidación actual de `['expenses', …]` al crear/editar/eliminar debe seguir coherente (p. ej. prefijo o claves alineadas).
 
 ## Verification

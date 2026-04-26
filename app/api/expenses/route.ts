@@ -67,6 +67,11 @@ const AMOUNT_COLUMNS =
     'amount_cop, amount_usd, amount_divided_cop, amount_divided_usd, amount_divided_3_cop, amount_divided_3_usd, amount_divided_4_cop, amount_divided_4_usd';
 const TOTALS_PAGE_SIZE = 1000;
 
+function addFinite(sum: number, raw: unknown): number {
+    const n = Number(raw ?? 0);
+    return Number.isFinite(n) ? sum + n : sum;
+}
+
 type FilterInput = { months: string[]; categoryIds: string[]; userIds: string[]; search: string | null };
 
 type AmountRow = {
@@ -121,14 +126,14 @@ async function sumFilteredExpenseAmounts(
         }
         const rows = (data ?? []) as AmountRow[];
         for (const r of rows) {
-            acc.amount_cop += Number(r.amount_cop ?? 0);
-            acc.amount_usd += Number(r.amount_usd ?? 0);
-            acc.amount_divided_cop += Number(r.amount_divided_cop ?? 0);
-            acc.amount_divided_usd += Number(r.amount_divided_usd ?? 0);
-            acc.amount_divided_3_cop += Number(r.amount_divided_3_cop ?? 0);
-            acc.amount_divided_3_usd += Number(r.amount_divided_3_usd ?? 0);
-            acc.amount_divided_4_cop += Number(r.amount_divided_4_cop ?? 0);
-            acc.amount_divided_4_usd += Number(r.amount_divided_4_usd ?? 0);
+            acc.amount_cop = addFinite(acc.amount_cop, r.amount_cop);
+            acc.amount_usd = addFinite(acc.amount_usd, r.amount_usd);
+            acc.amount_divided_cop = addFinite(acc.amount_divided_cop, r.amount_divided_cop);
+            acc.amount_divided_usd = addFinite(acc.amount_divided_usd, r.amount_divided_usd);
+            acc.amount_divided_3_cop = addFinite(acc.amount_divided_3_cop, r.amount_divided_3_cop);
+            acc.amount_divided_3_usd = addFinite(acc.amount_divided_3_usd, r.amount_divided_3_usd);
+            acc.amount_divided_4_cop = addFinite(acc.amount_divided_4_cop, r.amount_divided_4_cop);
+            acc.amount_divided_4_usd = addFinite(acc.amount_divided_4_usd, r.amount_divided_4_usd);
         }
         if (rows.length < TOTALS_PAGE_SIZE) {
             return { data: acc, error: null };

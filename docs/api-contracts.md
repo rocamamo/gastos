@@ -65,7 +65,8 @@ Listado de gastos con filtros y **paginación server-side**.
 Notas:
 
 - `data` mantiene la forma de gasto existente (incluye `users(...)` y `categories(...)` como antes), pero ahora viene envuelto.
-- `totals` refleja la suma del **dataset completo filtrado** (mismos criterios que el listado), no solo de la página actual. El servidor recorre las filas en lotes (p. ej. 1000) y acumula importes, sin depender de agregados SQL tipo `sum()` de PostgREST.
+- `totals` refleja la suma del **dataset completo filtrado** (mismos criterios que el listado), no solo de la página actual. El servidor recorre las filas en lotes (p. ej. 1000) y acumula importes en Node (solo se suman valores finitos por columna), sin depender de agregados SQL tipo `sum()` de PostgREST.
+- **Consistencia:** la lista paginada y el cálculo de totales se obtienen en paralelo y el total se construye en varias consultas paginadas por rango. En condiciones normales y con el volumen típico de la app, lista y totales son coherentes. Si hubiera muchas altas/bajas/ediciones simultáneas, en teoría la lista y los totales podrían no corresponder exactamente al mismo instante de la base de datos; se prioriza simplicidad frente a un snapshot transaccional único.
 
 ## Documentación interactiva
 
