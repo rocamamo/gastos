@@ -121,5 +121,63 @@ describe('GET /api/expenses', () => {
         );
         expect(body.data).toHaveLength(1);
     });
+
+    it('does not produce NaN totals when amount columns are non-numeric', async () => {
+        const pageRows = [{ id: 'e1', amount_cop: 100, amount_usd: 1 }];
+        const rowsResult = { data: pageRows, error: null, count: 1 };
+        const totalsResult = {
+            data: [
+                {
+                    amount_cop: 'foo',
+                    amount_usd: 'bar',
+                    amount_divided_cop: null,
+                    amount_divided_usd: undefined,
+                    amount_divided_3_cop: 'NaN',
+                    amount_divided_3_usd: 'Infinity',
+                    amount_divided_4_cop: '-Infinity',
+                    amount_divided_4_usd: 0,
+                },
+            ],
+            error: null,
+        };
+
+        const rowsQuery = createThenableQuery(rowsResult);
+        const totalsQuery = createThenableQuery(totalsResult);
+
+        const supabase: SupabaseMock = {
+            auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } }, error: null }) },
+            from: jest.fn(() => ({
+                select: jest.fn((...args: unknown[]) => {
+                    const isRowsSelect = typeof args[0] === 'string' && args[0].includes('users(');
+                    return isRowsSelect ? rowsQuery : totalsQuery;
+                }),
+            })),
+        };
+
+        createClient.mockResolvedValue(supabase);
+
+        const res = await GET(makeRequest('http://localhost/api/expenses?page=1&per_page=20'));
+        expect(res.status).toBe(200);
+        const body = await res.json();
+
+        // Non-finite or non-numeric values are ignored; totals should remain finite numbers.
+        expect(Number.isFinite(body.totals.amount_cop)).toBe(true);
+        expect(Number.isFinite(body.totals.amount_usd)).toBe(true);
+        expect(Number.isFinite(body.totals.amount_divided_3_cop)).toBe(true);
+        expect(Number.isFinite(body.totals.amount_divided_3_usd)).toBe(true);
+        expect(Number.isFinite(body.totals.amount_divided_4_cop)).toBe(true);
+        expect(Number.isFinite(body.totals.amount_divided_4_usd)).toBe(true);
+
+        expect(body.totals).toEqual(
+            expect.objectContaining({
+                amount_cop: 0,
+                amount_usd: 0,
+                amount_divided_3_cop: 0,
+                amount_divided_3_usd: 0,
+                amount_divided_4_cop: 0,
+                amount_divided_4_usd: 0,
+            })
+        );
+    });
 });
 
