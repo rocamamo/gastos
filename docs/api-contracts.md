@@ -65,7 +65,7 @@ Listado de gastos con filtros y **paginación server-side**.
 Notas:
 
 - `data` mantiene la forma de gasto existente (incluye `users(...)` y `categories(...)` como antes), pero ahora viene envuelto.
-- `totals` refleja la suma del **dataset completo filtrado**, no solo de la página actual.
+- `totals` refleja la suma del **dataset completo filtrado** (mismos criterios que el listado), no solo de la página actual. El servidor recorre las filas en lotes (p. ej. 1000) y acumula importes, sin depender de agregados SQL tipo `sum()` de PostgREST.
 
 ## Documentación interactiva
 

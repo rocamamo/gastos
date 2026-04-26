@@ -63,6 +63,80 @@ function applyExpenseFilters<TQuery>(
     return q;
 }
 
+const AMOUNT_COLUMNS =
+    'amount_cop, amount_usd, amount_divided_cop, amount_divided_usd, amount_divided_3_cop, amount_divided_3_usd, amount_divided_4_cop, amount_divided_4_usd';
+const TOTALS_PAGE_SIZE = 1000;
+
+type FilterInput = { months: string[]; categoryIds: string[]; userIds: string[]; search: string | null };
+
+type AmountRow = {
+    amount_cop: string | number | null;
+    amount_usd: string | number | null;
+    amount_divided_cop: string | number | null;
+    amount_divided_usd: string | number | null;
+    amount_divided_3_cop: string | number | null;
+    amount_divided_3_usd: string | number | null;
+    amount_divided_4_cop: string | number | null;
+    amount_divided_4_usd: string | number | null;
+};
+
+type ExpenseTotals = {
+    amount_cop: number;
+    amount_usd: number;
+    amount_divided_cop: number;
+    amount_divided_usd: number;
+    amount_divided_3_cop: number;
+    amount_divided_3_usd: number;
+    amount_divided_4_cop: number;
+    amount_divided_4_usd: number;
+};
+
+/** Suma importes en servidor sin PostgREST aggregates (p. ej. `sum()` requiere agregados habilitados en el proyecto). */
+async function sumFilteredExpenseAmounts(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    filterInput: FilterInput
+): Promise<{ data: ExpenseTotals; error: null } | { data: null; error: { message: string } }> {
+    const acc: ExpenseTotals = {
+        amount_cop: 0,
+        amount_usd: 0,
+        amount_divided_cop: 0,
+        amount_divided_usd: 0,
+        amount_divided_3_cop: 0,
+        amount_divided_3_usd: 0,
+        amount_divided_4_cop: 0,
+        amount_divided_4_usd: 0,
+    };
+
+    let offset = 0;
+    while (true) {
+        const { data, error } = await applyExpenseFilters(
+            supabase
+                .from('expenses')
+                .select(AMOUNT_COLUMNS)
+                .range(offset, offset + TOTALS_PAGE_SIZE - 1),
+            filterInput
+        );
+        if (error) {
+            return { data: null, error: { message: error.message } };
+        }
+        const rows = (data ?? []) as AmountRow[];
+        for (const r of rows) {
+            acc.amount_cop += Number(r.amount_cop ?? 0);
+            acc.amount_usd += Number(r.amount_usd ?? 0);
+            acc.amount_divided_cop += Number(r.amount_divided_cop ?? 0);
+            acc.amount_divided_usd += Number(r.amount_divided_usd ?? 0);
+            acc.amount_divided_3_cop += Number(r.amount_divided_3_cop ?? 0);
+            acc.amount_divided_3_usd += Number(r.amount_divided_3_usd ?? 0);
+            acc.amount_divided_4_cop += Number(r.amount_divided_4_cop ?? 0);
+            acc.amount_divided_4_usd += Number(r.amount_divided_4_usd ?? 0);
+        }
+        if (rows.length < TOTALS_PAGE_SIZE) {
+            return { data: acc, error: null };
+        }
+        offset += TOTALS_PAGE_SIZE;
+    }
+}
+
 export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -112,53 +186,30 @@ export async function GET(request: NextRequest) {
     const end = start + per_page - 1;
     rowsQuery = rowsQuery.range(start, end);
 
-    const [{ data: pageRows, error: pageError, count }, { data: totalsRows, error: totalsError }] =
-        await Promise.all([
-            rowsQuery,
-            applyExpenseFilters(
-                supabase
-                    .from('expenses')
-                    .select(
-                        [
-                            'amount_cop.sum()',
-                            'amount_usd.sum()',
-                            'amount_divided_cop.sum()',
-                            'amount_divided_usd.sum()',
-                            'amount_divided_3_cop.sum()',
-                            'amount_divided_3_usd.sum()',
-                            'amount_divided_4_cop.sum()',
-                            'amount_divided_4_usd.sum()',
-                        ].join(',')
-                    ),
-                { months, categoryIds, userIds, search }
-            ),
-        ]);
+    const filterInput: FilterInput = { months, categoryIds, userIds, search };
 
+    const [pageRes, sumRes] = await Promise.all([
+        rowsQuery,
+        sumFilteredExpenseAmounts(supabase, filterInput),
+    ]);
+
+    const { data: pageRows, error: pageError, count } = pageRes;
     if (pageError) {
         return NextResponse.json({ error: pageError.message }, { status: 500 });
     }
-    if (totalsError) {
-        return NextResponse.json({ error: totalsError.message }, { status: 500 });
+    if (sumRes.data === null) {
+        return NextResponse.json({ error: sumRes.error.message }, { status: 500 });
     }
 
     const total = count ?? 0;
     const total_pages = total === 0 ? 0 : Math.max(1, Math.ceil(total / per_page));
-    const totalsRow = ((totalsRows?.[0] ?? {}) as unknown) as Record<string, unknown>;
+    const totalsData = sumRes.data;
 
     if (total === 0) {
         return NextResponse.json({
             data: [],
             pagination: { total, page: 1, per_page, total_pages },
-            totals: {
-                amount_cop: Number(totalsRow.amount_cop ?? 0),
-                amount_usd: Number(totalsRow.amount_usd ?? 0),
-                amount_divided_cop: Number(totalsRow.amount_divided_cop ?? 0),
-                amount_divided_usd: Number(totalsRow.amount_divided_usd ?? 0),
-                amount_divided_3_cop: Number(totalsRow.amount_divided_3_cop ?? 0),
-                amount_divided_3_usd: Number(totalsRow.amount_divided_3_usd ?? 0),
-                amount_divided_4_cop: Number(totalsRow.amount_divided_4_cop ?? 0),
-                amount_divided_4_usd: Number(totalsRow.amount_divided_4_usd ?? 0),
-            },
+            totals: { ...totalsData },
         });
     }
 
@@ -182,32 +233,14 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             data: normalizedRows ?? [],
             pagination: { total, page, per_page, total_pages },
-            totals: {
-                amount_cop: Number(totalsRow.amount_cop ?? 0),
-                amount_usd: Number(totalsRow.amount_usd ?? 0),
-                amount_divided_cop: Number(totalsRow.amount_divided_cop ?? 0),
-                amount_divided_usd: Number(totalsRow.amount_divided_usd ?? 0),
-                amount_divided_3_cop: Number(totalsRow.amount_divided_3_cop ?? 0),
-                amount_divided_3_usd: Number(totalsRow.amount_divided_3_usd ?? 0),
-                amount_divided_4_cop: Number(totalsRow.amount_divided_4_cop ?? 0),
-                amount_divided_4_usd: Number(totalsRow.amount_divided_4_usd ?? 0),
-            },
+            totals: { ...totalsData },
         });
     }
 
     return NextResponse.json({
         data: pageRows ?? [],
         pagination: { total, page, per_page, total_pages },
-        totals: {
-            amount_cop: Number(totalsRow.amount_cop ?? 0),
-            amount_usd: Number(totalsRow.amount_usd ?? 0),
-            amount_divided_cop: Number(totalsRow.amount_divided_cop ?? 0),
-            amount_divided_usd: Number(totalsRow.amount_divided_usd ?? 0),
-            amount_divided_3_cop: Number(totalsRow.amount_divided_3_cop ?? 0),
-            amount_divided_3_usd: Number(totalsRow.amount_divided_3_usd ?? 0),
-            amount_divided_4_cop: Number(totalsRow.amount_divided_4_cop ?? 0),
-            amount_divided_4_usd: Number(totalsRow.amount_divided_4_usd ?? 0),
-        },
+        totals: { ...totalsData },
     });
 }
 
