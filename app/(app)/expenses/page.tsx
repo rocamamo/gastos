@@ -159,8 +159,12 @@ function ExpensesPageContent() {
     }, [selectedMonth, selectedCategories, selectedUsers, searchText]);
 
     // Debounce URL updates for search to avoid rewriting on every keypress.
+    // Si el texto ya coincide con la URL, no llamar a setFiltersInUrl: esa función
+    // borra siempre `page` y anulaba ?page=2 cuando el usuario paginaba antes de 350ms.
     useEffect(() => {
         const handle = setTimeout(() => {
+            const inUrl = new URLSearchParams(window.location.search).get('search') ?? '';
+            if (searchText === inUrl) return;
             setFiltersInUrl({ search: searchText });
         }, 350);
         return () => clearTimeout(handle);
