@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
@@ -94,7 +94,7 @@ const AttachmentLink = ({ url }: { url: string }) => {
     );
 };
 
-export default function ExpensesPage() {
+function ExpensesPageContent() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedExpense, setSelectedExpense] = useState<ExpenseRow | null>(null);
@@ -636,5 +636,19 @@ export default function ExpensesPage() {
                 </div>
             </Modal>
         </div>
+    );
+}
+
+export default function ExpensesPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="flex justify-center p-12">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" aria-label="Cargando" />
+                </div>
+            }
+        >
+            <ExpensesPageContent />
+        </Suspense>
     );
 }

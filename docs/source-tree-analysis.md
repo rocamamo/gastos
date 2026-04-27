@@ -22,7 +22,7 @@ Proyecto **monolito** con raíz de código en el directorio del repositorio. Ent
 ├── lib/                      # Supabase, validaciones, swagger, servicios, utilidades
 ├── supabase/migrations/      # SQL de esquema
 ├── __tests__/                # Jest
-├── middleware.ts             # Sesión Supabase
+├── proxy.ts                  # Proxy Next.js; sesión Supabase
 ├── next.config.ts
 └── package.json
 ```

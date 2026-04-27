@@ -11,7 +11,7 @@
 - **Stack:** Next.js 16, React 19, Tailwind 4, Supabase, TanStack Query, Zod
 - **Entrada app:** `app/layout.tsx`, páginas en `app/` y `app/(app)/`
 - **API:** prefijo `/api/*` (ver listado en [api-contracts.md](./api-contracts.md))
-- **Patrón:** capa de presentación en `app/` y `components/`; persistencia y auth en Supabase; sesión vía `middleware.ts`
+- **Patrón:** capa de presentación en `app/` y `components/`; persistencia y auth en Supabase; sesión vía `proxy.ts`
 
 ## Documentación generada
 

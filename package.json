@@ -31,6 +31,20 @@
     "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6"
   },
+  "overrides": {
+    "react-copy-to-clipboard": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    },
+    "react-debounce-input": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    },
+    "react-inspector": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
+  },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",

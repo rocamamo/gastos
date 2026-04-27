@@ -23,7 +23,7 @@ Base: rutas relativas al origen de la aplicación Next (p. ej. `/api/...`).
 ## Autenticación
 
 - Patrón esperado (según `project-context.md`): en handlers, `getUser()` con cliente Supabase servidor; 401 si no hay sesión.
-- Middleware global en `middleware.ts` delega en `updateSession` de Supabase.
+- Proxy global en `proxy.ts` (Next.js 16) delega en `updateSession` de Supabase.
 
 ## GET `/api/expenses`
 

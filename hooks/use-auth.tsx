@@ -20,8 +20,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
 
     useEffect(() => {
-        if (typeof window !== 'undefined' && (window as Window & { __E2E_USER_ID__?: string }).__E2E_USER_ID__) {
-            const id = (window as Window & { __E2E_USER_ID__: string }).__E2E_USER_ID__;
+        if (typeof window === 'undefined') {
+            return;
+        }
+        const e2eId = (window as unknown as { __E2E_USER_ID__?: string }).__E2E_USER_ID__;
+        if (e2eId) {
+            const id = e2eId;
             setUser({
                 id,
                 email: 'e2e@local.test',
