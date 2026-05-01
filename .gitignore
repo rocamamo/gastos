@@ -9,6 +9,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.yarn/cache/
 
 # testing
 /coverage
@@ -47,10 +48,25 @@ next-env.d.ts
 .agent/
 .agents/
 _bmad-output/
-_bmad/config.user.toml
+_bmad/
+.bmad/
 
 # --- Otros ---
 .vscode/
 .idea/
 *.log
+
+# temp
+tmp/
+temp/
+
+# Local configuration
+*.local
+*.local.*
+
+# BD/seed
+*.sqlite
+*.seed
+*.seed.sql
+
 
