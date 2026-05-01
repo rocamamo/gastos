@@ -84,8 +84,12 @@ export async function GET(request: NextRequest) {
                 }
 
                 expenses.forEach((expense) => {
+                    // Parse date manually to avoid timezone shifts
+                    const [year, month, day] = expense.expense_date.split('-').map(Number);
+                    const date = new Date(year, month - 1, day);
+
                     worksheet.addRow({
-                        expense_date: new Date(expense.expense_date),
+                        expense_date: date,
                         user_name: expense.users?.name || 'N/A',
                         category_name: expense.categories?.name || 'N/A',
                         detail: expense.detail,

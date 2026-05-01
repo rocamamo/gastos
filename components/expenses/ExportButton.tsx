@@ -22,7 +22,10 @@ export function ExportButton() {
             
             // Create a link and trigger download
             const response = await fetch(url);
-            if (!response.ok) throw new Error('Error al exportar el archivo');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Error al exportar el archivo');
+            }
             
             const blob = await response.blob();
             const downloadUrl = window.URL.createObjectURL(blob);
