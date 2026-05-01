@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { MultiSelect, MonthSelect } from '@/components/ui/multi-select';
 import { ExpenseForm } from '@/components/expenses/ExpenseForm';
+import { ExportButton } from '@/components/expenses/ExportButton';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Plus, Search, Trash2, Paperclip, FilterX, Pencil } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -309,9 +310,12 @@ function ExpensesPageContent() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Registro de Gastos</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Gestiona, añade y busca los gastos compartidos.</p>
                 </div>
-                <Button onClick={handleNew} className="sm:w-auto w-full gap-2">
-                    <Plus className="h-5 w-5" /> Nuevo Gasto
-                </Button>
+                <div className="flex items-center gap-2 sm:w-auto w-full">
+                    <ExportButton />
+                    <Button onClick={handleNew} className="flex-1 sm:flex-initial gap-2">
+                        <Plus className="h-5 w-5" /> Nuevo Gasto
+                    </Button>
+                </div>
             </div>
 
             {/* Filters */}
